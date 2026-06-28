@@ -1,0 +1,227 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WelfareFlow India — QA Acceptance Report</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fdf8f1;color:#1c1917;margin:0;padding:24px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:24px;margin:0 0 4px;}
+  .sub{color:#78716c;margin:0 0 20px;}
+  .summary{display:flex;gap:16px;align-items:center;background:#fff;border:1px solid #e7e5e4;border-radius:16px;padding:16px 20px;margin-bottom:24px;}
+  .summary .big{font-size:34px;font-weight:800;}
+  .card{background:#fff;border:1px solid #e7e5e4;border-radius:16px;padding:18px 20px;margin-bottom:18px;}
+  .card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .card-head h2{font-size:17px;margin:0;}
+  .badge{color:#fff;font-weight:700;font-size:13px;padding:4px 12px;border-radius:999px;}
+  table.spec{width:100%;border-collapse:collapse;margin:12px 0;}
+  table.spec th{text-align:left;width:84px;vertical-align:top;color:#a8a29e;font-size:12px;letter-spacing:.08em;padding:4px 8px 4px 0;}
+  table.spec td{padding:4px 0;font-size:15px;}
+  .muted{color:#78716c;}
+  .tl-title{font-weight:600;margin:14px 0 6px;color:#57534e;}
+  ul.timeline{list-style:none;margin:0;padding:0;border-left:3px solid #f0e6d6;}
+  ul.timeline li{padding:5px 0 5px 14px;font-size:14px;}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:#f5f5f4;color:#57534e;margin-right:6px;font-family:ui-monospace,monospace;}
+  .tag-anomaly_detected{background:#fef3c7;color:#92400e;}
+  .tag-agent_result{background:#dcfce7;color:#166534;}
+  .tag-error{background:#fee2e2;color:#991b1b;}
+</style></head><body><div class="wrap">
+  <h1>WelfareFlow India — QA Acceptance Report</h1>
+  <p class="sub">Generated 2026-06-27 08:42 UTC · target http://localhost:8013 · read top-to-bottom; no app needed.</p>
+  <div class="summary"><span class="big" style="color:#138808">13/13</span>
+  <div><b>scenarios passed</b><br><span class="muted">Each card below states what should happen and shows what actually happened.</span></div></div>
+  
+        <section class="card">
+          <div class="card-head">
+            <h2>CITIZEN-001 — Ramesh Kumar — name MISMATCH on documents</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Ramesh Kumar, a farmer from Mandya (Karnataka) with 2 acres. His Aadhaar says &#x27;Ramesh Kumar&#x27; but his Ration Card says &#x27;Ramesha K&#x27; and his passbook says &#x27;R. Kumar&#x27;.</td></tr>
+            <tr><th>WHEN</th><td>He speaks his request and uploads Aadhaar + Ration Card + Bank Passbook.</td></tr>
+            <tr><th>THEN</th><td>The system must STOP before submitting and ask him to fix the name (status MISSING_DOCUMENTS), and generate a Name-Correction Affidavit.</td></tr>
+            <tr><th>WHY</th><td class="muted">Submitting with mismatched names is the #1 cause of welfare rejection. The name-match score (0.76) is below the 0.85 threshold, so it must flag, not pass.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>MISSING_DOCUMENTS</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Ramesh Kumar&#x27;, land=2.0ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-anomaly_detected'>anomaly_detected</span> ⚠️  PROBLEM: Name mismatch: &#x27;Ramesh Kumar&#x27; on aadhaar vs &#x27;Ramesha K&#x27; on ration_card (Jaro-Winkler=0.7600, threshold=0.85)</li><li><span class='tag tag-anomaly_detected'>anomaly_detected</span> ⚠️  PROBLEM: Name mismatch: &#x27;Ramesh Kumar&#x27; on aadhaar vs &#x27;R. Kumar&#x27; on bank_passbook (Jaro-Winkler=0.7600, threshold=0.85)</li><li><span class='tag tag-anomaly_detected'>anomaly_detected</span> ⚠️  PROBLEM: Name mismatch: &#x27;Ramesha K&#x27; on ration_card vs &#x27;R. Kumar&#x27; on bank_passbook (Jaro-Winkler=0.6411, threshold=0.85)</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 3 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> exception_management: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> prepared name-correction affidavit; case blocked for fixing</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Your name is spelled differently on your documents — Ramesh Kumar versus Ramesha K. If we submit now, the application will be rejected. Let us fix this first with a name mismatch affidavit.&quot;</li><li><span class='tag tag-stream_end'>stream_end</span> exception_management: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>CITIZEN-002 — Lakshmi Devi — spelling variant, should PASS</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Lakshmi Devi from Sikar (Rajasthan), 1.5 acres. Ration Card spells it &#x27;Laxmi Devi&#x27; (a normal transliteration variant).</td></tr>
+            <tr><th>WHEN</th><td>She submits her request with all three documents.</td></tr>
+            <tr><th>THEN</th><td>The application should go THROUGH to UiPath (status PENDING_UIPATH) — no affidavit needed.</td></tr>
+            <tr><th>WHY</th><td class="muted">&#x27;Lakshmi&#x27; vs &#x27;Laxmi&#x27; is a legitimate vowel variant that scores above 0.85, so it must NOT be wrongly blocked.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Lakshmi Devi&#x27;, land=1.5ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 0 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> npci_seeding: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> bank link (NPCI): SEEDED at Punjab National Bank</li><li><span class='tag tag-agent_start'>agent_start</span> uipath_execution: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> uipath_execution: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> application sent to UiPath (mock), tx=tx_mock_ccb58375_e858d07c</li><li><span class='tag tag-stream_end'>stream_end</span> uipath_execution: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>CITIZEN-003 — Suresh Prasad — perfect match, should PASS</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Suresh Prasad from Varanasi (UP), 0.8 acres. All documents have the exact same name.</td></tr>
+            <tr><th>WHEN</th><td>He submits his request with all three documents.</td></tr>
+            <tr><th>THEN</th><td>The application should go straight through to UiPath (status PENDING_UIPATH).</td></tr>
+            <tr><th>WHY</th><td class="muted">Everything matches perfectly, so there is nothing to flag.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Suresh Prasad&#x27;, land=0.8ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 0 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> npci_seeding: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> bank link (NPCI): PENDING at Union Bank of India</li><li><span class='tag tag-agent_start'>agent_start</span> uipath_execution: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> uipath_execution: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> application sent to UiPath (mock), tx=tx_mock_a5ce743f_5c121778</li><li><span class='tag tag-stream_end'>stream_end</span> uipath_execution: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>CITIZEN-004 — Priya Sharma — trailing-vowel variant, should PASS</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Priya Sharma from Nashik (Maharashtra), 3.2 acres, income ₹75,000. Ration Card spells it &#x27;Priya Sharmaa&#x27;.</td></tr>
+            <tr><th>WHEN</th><td>She submits her request with all three documents.</td></tr>
+            <tr><th>THEN</th><td>The application should go through to UiPath (status PENDING_UIPATH).</td></tr>
+            <tr><th>WHY</th><td class="muted">A single trailing extra vowel is a minor variant that should score above threshold and pass.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Priya Sharma&#x27;, land=3.2ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 0 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> npci_seeding: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> bank link (NPCI): SEEDED at Bank of Maharashtra</li><li><span class='tag tag-agent_start'>agent_start</span> uipath_execution: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> uipath_execution: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> application sent to UiPath (mock), tx=tx_mock_d56eb8f9_4038cd37</li><li><span class='tag tag-stream_end'>stream_end</span> uipath_execution: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>CITIZEN-005 — Mohammed Rashid — abbreviation MISMATCH</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Mohammed Rashid from Nizamabad (Telangana), 1 acre. Ration Card abbreviates it to &#x27;Mohd Rashid&#x27;.</td></tr>
+            <tr><th>WHEN</th><td>He submits his request with all three documents.</td></tr>
+            <tr><th>THEN</th><td>The system must STOP and ask him to fix the name (status MISSING_DOCUMENTS).</td></tr>
+            <tr><th>WHY</th><td class="muted">&#x27;Mohammed&#x27; shrinking to &#x27;Mohd&#x27; is a token truncation that scores below 0.85 — exactly the kind of mismatch that causes rejection, so it must flag.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>MISSING_DOCUMENTS</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Mohammed Rashid&#x27;, land=1.0ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-anomaly_detected'>anomaly_detected</span> ⚠️  PROBLEM: Name mismatch: &#x27;Mohammed Rashid&#x27; on aadhaar vs &#x27;Mohd Rashid&#x27; on ration_card (Jaro-Winkler=0.7958, threshold=0.85)</li><li><span class='tag tag-anomaly_detected'>anomaly_detected</span> ⚠️  PROBLEM: Name mismatch: &#x27;Mohd Rashid&#x27; on ration_card vs &#x27;Mohamed Rashid&#x27; on bank_passbook (Jaro-Winkler=0.8083, threshold=0.85)</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 2 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> exception_management: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> prepared name-correction affidavit; case blocked for fixing</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Your name is spelled differently on your documents — Mohammed Rashid versus Mohd Rashid. If we submit now, the application will be rejected. Let us fix this first with a name mismatch affidavit.&quot;</li><li><span class='tag tag-stream_end'>stream_end</span> exception_management: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>VOICE_ONLY — Voice onboarding — audio, no typed text</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Lakshmi Devi sends a voice recording and types NOTHING.</td></tr>
+            <tr><th>WHEN</th><td>She submits only audio (base64), with an empty transcript.</td></tr>
+            <tr><th>THEN</th><td>The backend should transcribe her voice (Sarvam Saaras STT) and complete to PENDING_UIPATH.</td></tr>
+            <tr><th>WHY</th><td class="muted">Voice-first is the whole point for low-literacy users; the request must not be rejected just because there is no typed transcript.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> 🎤 transcribed voice: &quot;Namaste, my name is Lakshmi Devi. I am from Sikar. I have about 1.5 acres of farm land. I want help applying for PM-Kisan and Ayushman Bharat.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Lakshmi Devi&#x27;, land=1.5ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_log'>agent_log</span> document_audit: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 0 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> npci_seeding: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> bank link (NPCI): SEEDED at Punjab National Bank</li><li><span class='tag tag-agent_start'>agent_start</span> uipath_execution: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> uipath_execution: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> application sent to UiPath (mock), tx=tx_mock_1041d9a7_e677fd7b</li><li><span class='tag tag-stream_end'>stream_end</span> uipath_execution: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>NO_DOCS — No documents uploaded — audit skipped</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>Suresh Prasad submits with NO documents at all.</td></tr>
+            <tr><th>WHEN</th><td>He submits only his spoken request.</td></tr>
+            <tr><th>THEN</th><td>The document check is skipped and the application proceeds to UiPath (PENDING_UIPATH).</td></tr>
+            <tr><th>WHY</th><td class="muted">With nothing to compare, there is no mismatch to block on — the flow should not get stuck.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li><span class='tag tag-agent_start'>agent_start</span> voice_intent_agent: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> voice_intent_agent: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> understood citizen: name=&#x27;Suresh Prasad&#x27;, land=0.8ac</li><li><span class='tag tag-agent_start'>agent_start</span> eligibility_router: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> eligible schemes: Pradhan Mantri Kisan Samman Nidhi, Ayushman Bharat – PM Jan Arogya Yojana</li><li><span class='tag tag-agent_log'>agent_log</span> 🔊 spoke to citizen: &quot;Based on your land and details, you are eligible for Pradhan Mantri Kisan Samman Nidhi and Ayushman Bharat – PM Jan Arogya Yojana. Let us now check your documents.&quot;</li><li><span class='tag tag-agent_start'>agent_start</span> document_audit: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> documents checked — 0 problem(s) found</li><li><span class='tag tag-agent_start'>agent_start</span> npci_seeding: starting…</li><li><span class='tag tag-agent_result'>agent_result</span> bank link (NPCI): PENDING at Union Bank of India</li><li><span class='tag tag-agent_start'>agent_start</span> uipath_execution: starting…</li><li><span class='tag tag-agent_log'>agent_log</span> uipath_execution: agent_log</li><li><span class='tag tag-agent_result'>agent_result</span> application sent to UiPath (mock), tx=tx_mock_6345b1c3_719f7b18</li><li><span class='tag tag-stream_end'>stream_end</span> uipath_execution: stream_end</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>GUARD_OTP — Reject when OTP not verified</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>A request with otp_verified=false</td></tr>
+            <tr><th>WHEN</th><td>POST /initialize</td></tr>
+            <tr><th>THEN</th><td>Rejected with HTTP 403</td></tr>
+            <tr><th>WHY</th><td class="muted">Consent must be OTP-confirmed (DPDP Act).</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>HTTP_403</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>GUARD_CONSENT — Reject when no consent items</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>A request with an empty consent list</td></tr>
+            <tr><th>WHEN</th><td>POST /initialize</td></tr>
+            <tr><th>THEN</th><td>Rejected with HTTP 422</td></tr>
+            <tr><th>WHY</th><td class="muted">At least one itemised consent is required (DPDP Act).</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>HTTP_422</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>LIFE_CALLBACK — UiPath success callback completes the case</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>A case in PENDING_UIPATH</td></tr>
+            <tr><th>WHEN</th><td>UiPath posts a SUCCESS callback</td></tr>
+            <tr><th>THEN</th><td>Case becomes COMPLETE</td></tr>
+            <tr><th>WHY</th><td class="muted">The citizen&#x27;s application is confirmed done.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>COMPLETE</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>LIFE_SLA — Delayed cases auto-escalate (Right to Service)</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>A pending case older than the SLA</td></tr>
+            <tr><th>WHEN</th><td>The SLA watchdog sweeps</td></tr>
+            <tr><th>THEN</th><td>The case is ESCALATED and an appeal is queued</td></tr>
+            <tr><th>WHY</th><td class="muted">The citizen should not be stuck silently past the legal SLA.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>ESCALATED</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>LIFE_REVOKE — Delete my data wipes the Aadhaar vault (DPDP) + needs the citizen&#x27;s token</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>An active case with stored identity</td></tr>
+            <tr><th>WHEN</th><td>The citizen revokes consent (token required)</td></tr>
+            <tr><th>THEN</th><td>Without the token → 403; with it, consent deactivated and the encrypted vault row hard-deleted</td></tr>
+            <tr><th>WHY</th><td class="muted">Right to withdraw / erase (DPDP Act 2023), but only the rightful owner may trigger it.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>REVOKED_BY_USER</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>LIFE_HITL — Human-in-the-loop: agent pauses for human approval before the irreversible government submission</h2>
+            <span class="badge" style="background:#138808">PASS</span>
+          </div>
+          <table class="spec">
+            <tr><th>GIVEN</th><td>A case submitted with require_approval=true</td></tr>
+            <tr><th>WHEN</th><td>The pipeline reaches the UiPath submission step</td></tr>
+            <tr><th>THEN</th><td>It pauses at AWAITING_APPROVAL and only submits after a human approves via /decision</td></tr>
+            <tr><th>WHY</th><td class="muted">Judges reward agents that act autonomously but keep humans accountable for high-impact, irreversible actions.</td></tr>
+            <tr><th>RESULT</th><td>Ended at <b>PENDING_UIPATH</b></td></tr>
+          </table>
+          <p class="tl-title">What actually happened, step by step:</p>
+          <ul class="timeline"><li class='muted'>(no live timeline — API-level check)</li></ul>
+        </section>
+</div></body></html>

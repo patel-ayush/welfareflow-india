@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  /* Warm, calm, high-contrast light background — easy on the eyes for a first
+     time / low-literacy user, and prints cleanly. */
+  background: #fdf8f1;
+  color: #1c1917;
+  font-size: 17px; /* larger base text for readability */
+}
+
+.glass-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.glass-scroll::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border-radius: 9999px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Print styles — only the affidavit document prints, full A4 layout. */
+/* ------------------------------------------------------------------ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #affidavit-print-area,
+  #affidavit-print-area * {
+    visibility: visible;
+  }
+  #affidavit-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 24px;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

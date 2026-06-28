@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WelfareFlow India — End-to-End Welfare Enrolment Process
+  UiPath AgentHack 2026 · Track 2: UiPath Maestro BPMN
+
+  This is a BPMN 2.0 model of the complete citizen welfare-enrolment business
+  process. It is importable into the UiPath Maestro modeling canvas
+  (bpmn.uipath.com / Studio Web → New Agentic Process).
+
+  Each task is bound at implementation time to a runtime actor:
+    • Agent Task   (serviceTask, impl="agent")   → "Start and wait for agent"
+    • Service Task (serviceTask, impl="workflow") → "Start and wait for RPA/API workflow"
+    • User Task    (userTask)                     → "Create Action Center app task"
+    • Send Task    (sendTask)                      → "Integration Services - API execution"
+
+  The agents/workflows are implemented by the WelfareFlow FastAPI backend
+  (agent_graph.py); see BPMN_PROCESS.md for the full task→implementation map.
+-->
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+    xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+    xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uipath="http://www.uipath.com/maestro/bpmn"
+    id="Definitions_WelfareFlow"
+    targetNamespace="http://welfareflow.india/agenthack2026">
+
+  <bpmn:collaboration id="Collaboration_WelfareFlow">
+    <bpmn:participant id="Participant_WelfareFlow" name="WelfareFlow India — Welfare Enrolment" processRef="Process_WelfareEnrolment" />
+  </bpmn:collaboration>
+
+  <!-- ===================================================================== -->
+  <!-- PROCESS: end-to-end welfare enrolment                                  -->
+  <!-- ===================================================================== -->
+  <bpmn:process id="Process_WelfareEnrolment" name="Welfare Enrolment" isExecutable="true">
+
+    <!-- Process variables (carried across all tasks; map to LangGraph state) -->
+    <bpmn:extensionElements>
+      <uipath:variables>
+        <uipath:variable name="CaseId" type="String" />
+        <uipath:variable name="CitizenId" type="String" />
+        <uipath:variable name="LanguageCode" type="String" />
+        <uipath:variable name="ExtractedProfile" type="Object" />
+        <uipath:variable name="EligibleSchemes" type="Collection" />
+        <uipath:variable name="MinNameMatchScore" type="Number" />
+        <uipath:variable name="DocumentsValid" type="Boolean" />
+        <uipath:variable name="NpciSeedingStatus" type="String" />
+        <uipath:variable name="ApprovalRequired" type="Boolean" />
+        <uipath:variable name="ApprovalDecision" type="String" />
+        <uipath:variable name="UiPathJobId" type="String" />
+      </uipath:variables>
+    </bpmn:extensionElements>
+
+    <!-- ── Start: citizen intake (voice/text + document photos) ──────────── -->
+    <bpmn:startEvent id="StartEvent_Intake" name="Citizen Intake Received">
+      <bpmn:documentation>Message start. Fired by POST /api/cases/initialize when a citizen submits voice/transcript + document images at a CSC kiosk. Outputs: CaseId, CitizenId, LanguageCode.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Start_Profile</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_Intake" />
+    </bpmn:startEvent>
+
+    <!-- ── Agent Task 1: extract citizen profile from voice ──────────────── -->
+    <bpmn:serviceTask id="Task_ExtractProfile" name="Extract Citizen Profile (Voice)" uipath:implementation="agent" uipath:agent="voice_intent_agent">
+      <bpmn:documentation>Agent task — "start and wait for agent". Sarvam Saaras STT transcribes the citizen's regional-language audio; Gemini Flash extracts a structured profile (name, district, land, age, health, income). Implemented by voice_intent_agent_node.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_Profile</bpmn:incoming>
+      <bpmn:outgoing>Flow_Profile_Eligibility</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- ── Agent Task 2: scheme eligibility ──────────────────────────────── -->
+    <bpmn:serviceTask id="Task_Eligibility" name="Determine Scheme Eligibility" uipath:implementation="agent" uipath:agent="eligibility_router">
+      <bpmn:documentation>Agent task. Evaluates PM-Kisan + Ayushman Bharat rules against the profile and produces a plain-language eligibility explanation. Implemented by eligibility_router_node. Sets EligibleSchemes.</bpmn:documentation>
+      <bpmn:incoming>Flow_Profile_Eligibility</bpmn:incoming>
+      <bpmn:outgoing>Flow_Eligibility_Audit</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- ── Agent Task 3: document audit (with error boundary) ────────────── -->
+    <bpmn:serviceTask id="Task_DocAudit" name="Audit Documents (OCR + Name Match)" uipath:implementation="agent" uipath:agent="document_audit">
+      <bpmn:documentation>Agent task. Sarvam Vision OCR reads Aadhaar/Ration/Passbook; token-aware Jaro-Winkler computes cross-document name-match scores. Sets MinNameMatchScore and DocumentsValid. Implemented by document_audit_node. A name mismatch (&lt; 0.85) raises the NameMismatch business error caught by the boundary event.</bpmn:documentation>
+      <bpmn:incoming>Flow_Eligibility_Audit</bpmn:incoming>
+      <bpmn:outgoing>Flow_Audit_Gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Error boundary event on the document-audit agent task -->
+    <bpmn:boundaryEvent id="Boundary_NameMismatch" name="Name Mismatch Detected" attachedToRef="Task_DocAudit">
+      <bpmn:documentation>Non-interrupting business-error boundary. Catches the document-audit anomaly and routes to human discrepancy resolution without losing the run.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Mismatch_Resolve</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_NameMismatch" errorRef="Error_NameMismatch" />
+    </bpmn:boundaryEvent>
+
+    <!-- ── Gateway: documents valid? ─────────────────────────────────────── -->
+    <bpmn:exclusiveGateway id="Gateway_DocsValid" name="Documents Valid?">
+      <bpmn:documentation>Exclusive gateway. Routes on DocumentsValid (min cross-document name score &gt;= 0.85). Maps to route_after_document_audit.</bpmn:documentation>
+      <bpmn:incoming>Flow_Audit_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Docs_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Docs_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- ── User Task: resolve discrepancy (exception path) ───────────────── -->
+    <bpmn:userTask id="Task_Resolve" name="Resolve Document Discrepancy" uipath:implementation="actioncenter">
+      <bpmn:documentation>User task — Action Center. Presents the Name Mismatch Affidavit (bilingual EN/KN) and e-KYC correction steps to the citizen/operator. Implemented by exception_management_node.</bpmn:documentation>
+      <bpmn:incoming>Flow_Mismatch_Resolve</bpmn:incoming>
+      <bpmn:incoming>Flow_Docs_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_Resolve_End</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ── Service Task: NPCI Aadhaar↔bank seeding ───────────────────────── -->
+    <bpmn:serviceTask id="Task_NPCI" name="Verify NPCI Aadhaar–Bank Seeding" uipath:implementation="workflow" uipath:agent="npci_seeding">
+      <bpmn:documentation>Service task — RPA/API workflow. Confirms the Aadhaar↔bank-account seeding required for Direct Benefit Transfer. Sets NpciSeedingStatus. Implemented by npci_seeding_node.</bpmn:documentation>
+      <bpmn:incoming>Flow_Docs_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_NPCI_Approval</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- ── Gateway: human approval required? ─────────────────────────────── -->
+    <bpmn:exclusiveGateway id="Gateway_Approval" name="Human Approval Required?">
+      <bpmn:documentation>Exclusive gateway. Routes on ApprovalRequired. Maps to route_after_npci.</bpmn:documentation>
+      <bpmn:incoming>Flow_NPCI_Approval</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approval_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Approval_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- ── User Task: citizen/operator approval ──────────────────────────── -->
+    <bpmn:userTask id="Task_Approval" name="Citizen / Operator Approval" uipath:implementation="actioncenter">
+      <bpmn:documentation>User task — Action Center. Human reviews the prepared application and approves/rejects before the irreversible submission. Implemented by await_approval_node + POST /api/cases/{id}/decision. Sets ApprovalDecision.</bpmn:documentation>
+      <bpmn:incoming>Flow_Approval_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approval_Decision</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ── Gateway: approved? ────────────────────────────────────────────── -->
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Approved?">
+      <bpmn:incoming>Flow_Approval_Decision</bpmn:incoming>
+      <bpmn:outgoing>Flow_Decision_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Decision_Rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- ── Send Task: submit to government portal ────────────────────────── -->
+    <bpmn:sendTask id="Task_Submit" name="Submit Welfare Application" uipath:implementation="workflow" uipath:agent="uipath_execution">
+      <bpmn:documentation>Send/Service task — triggers the downstream UiPath process that files the application on the government portal (PM-Kisan / Ayushman). Implemented by uipath_execution_node → uipath_maestro.start_process_instance. Sets UiPathJobId.</bpmn:documentation>
+      <bpmn:incoming>Flow_Decision_Approved</bpmn:incoming>
+      <bpmn:incoming>Flow_Approval_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_Submit_End</bpmn:outgoing>
+    </bpmn:sendTask>
+
+    <!-- ── End events ────────────────────────────────────────────────────── -->
+    <bpmn:endEvent id="End_Submitted" name="Application Submitted (Pending Govt)">
+      <bpmn:incoming>Flow_Submit_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_MissingDocs" name="On Hold — Missing Documents">
+      <bpmn:incoming>Flow_Resolve_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_Rejected" name="Rejected by Citizen">
+      <bpmn:incoming>Flow_Decision_Rejected</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ===================================================================== -->
+    <!-- EVENT SUB-PROCESS: 14-day Right-to-Service SLA watchdog               -->
+    <!-- Non-interrupting timer; runs in parallel with the main flow.          -->
+    <!-- ===================================================================== -->
+    <bpmn:subProcess id="SubProcess_SLA" name="SLA Watchdog (14-Day Right to Service)" triggeredByEvent="true">
+      <bpmn:documentation>Event subprocess. A non-interrupting timer fires when a submitted case has not progressed within the 14-day statutory SLA, escalating an automated appeal. Implemented by sla_watchdog.py.</bpmn:documentation>
+      <bpmn:startEvent id="TimerStart_SLA" name="14 Days Elapsed" isInterrupting="false">
+        <bpmn:outgoing>Flow_SLA_Escalate</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="TimerDef_SLA">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:startEvent>
+      <bpmn:sendTask id="Task_Escalate" name="Escalate Appeal (SMS / WhatsApp)" uipath:implementation="workflow">
+        <bpmn:documentation>Send task. Files an automated appeal to the higher authority and notifies the citizen via SMS/WhatsApp. Implemented by sla_watchdog.run_sla_watchdog_once.</bpmn:documentation>
+        <bpmn:incoming>Flow_SLA_Escalate</bpmn:incoming>
+        <bpmn:outgoing>Flow_SLA_End</bpmn:outgoing>
+      </bpmn:sendTask>
+      <bpmn:endEvent id="End_Escalated" name="Appeal Escalated">
+        <bpmn:incoming>Flow_SLA_End</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_SLA_Escalate" sourceRef="TimerStart_SLA" targetRef="Task_Escalate" />
+      <bpmn:sequenceFlow id="Flow_SLA_End" sourceRef="Task_Escalate" targetRef="End_Escalated" />
+    </bpmn:subProcess>
+
+    <!-- ── Sequence flows (main process) ─────────────────────────────────── -->
+    <bpmn:sequenceFlow id="Flow_Start_Profile" sourceRef="StartEvent_Intake" targetRef="Task_ExtractProfile" />
+    <bpmn:sequenceFlow id="Flow_Profile_Eligibility" sourceRef="Task_ExtractProfile" targetRef="Task_Eligibility" />
+    <bpmn:sequenceFlow id="Flow_Eligibility_Audit" sourceRef="Task_Eligibility" targetRef="Task_DocAudit" />
+    <bpmn:sequenceFlow id="Flow_Audit_Gateway" sourceRef="Task_DocAudit" targetRef="Gateway_DocsValid" />
+    <bpmn:sequenceFlow id="Flow_Mismatch_Resolve" sourceRef="Boundary_NameMismatch" targetRef="Task_Resolve" />
+    <bpmn:sequenceFlow id="Flow_Docs_No" name="No (score &lt; 0.85)" sourceRef="Gateway_DocsValid" targetRef="Task_Resolve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.DocumentsValid == false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Docs_Yes" name="Yes" sourceRef="Gateway_DocsValid" targetRef="Task_NPCI">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.DocumentsValid == true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Resolve_End" sourceRef="Task_Resolve" targetRef="End_MissingDocs" />
+    <bpmn:sequenceFlow id="Flow_NPCI_Approval" sourceRef="Task_NPCI" targetRef="Gateway_Approval" />
+    <bpmn:sequenceFlow id="Flow_Approval_Yes" name="Yes" sourceRef="Gateway_Approval" targetRef="Task_Approval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.ApprovalRequired == true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Approval_No" name="No" sourceRef="Gateway_Approval" targetRef="Task_Submit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.ApprovalRequired == false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Approval_Decision" sourceRef="Task_Approval" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_Decision_Approved" name="Approved" sourceRef="Gateway_Decision" targetRef="Task_Submit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.ApprovalDecision == "Approved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Decision_Rejected" name="Rejected" sourceRef="Gateway_Decision" targetRef="End_Rejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">vars.ApprovalDecision == "Rejected"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Submit_End" sourceRef="Task_Submit" targetRef="End_Submitted" />
+  </bpmn:process>
+
+  <!-- Business error definition referenced by the boundary event -->
+  <bpmn:error id="Error_NameMismatch" name="NameMismatch" errorCode="DOC_NAME_MISMATCH" />
+
+  <!-- ===================================================================== -->
+  <!-- DIAGRAM INTERCHANGE (visual layout)                                    -->
+  <!-- ===================================================================== -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_WelfareFlow">
+    <bpmndi:BPMNPlane id="BPMNPlane_WelfareFlow" bpmnElement="Collaboration_WelfareFlow">
+
+      <bpmndi:BPMNShape id="Participant_di" bpmnElement="Participant_WelfareFlow" isHorizontal="true">
+        <dc:Bounds x="120" y="60" width="1560" height="420" />
+      </bpmndi:BPMNShape>
+
+      <!-- main flow -->
+      <bpmndi:BPMNShape id="StartEvent_Intake_di" bpmnElement="StartEvent_Intake">
+        <dc:Bounds x="172" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="150" y="265" width="82" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ExtractProfile_di" bpmnElement="Task_ExtractProfile">
+        <dc:Bounds x="260" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Eligibility_di" bpmnElement="Task_Eligibility">
+        <dc:Bounds x="420" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DocAudit_di" bpmnElement="Task_DocAudit">
+        <dc:Bounds x="580" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_NameMismatch_di" bpmnElement="Boundary_NameMismatch">
+        <dc:Bounds x="612" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="648" y="290" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_DocsValid_di" bpmnElement="Gateway_DocsValid" isMarkerVisible="true">
+        <dc:Bounds x="735" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="728" y="185" width="64" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NPCI_di" bpmnElement="Task_NPCI">
+        <dc:Bounds x="840" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Approval_di" bpmnElement="Gateway_Approval" isMarkerVisible="true">
+        <dc:Bounds x="1005" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="990" y="185" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Approval_di" bpmnElement="Task_Approval">
+        <dc:Bounds x="1110" y="100" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Decision_di" bpmnElement="Gateway_Decision" isMarkerVisible="true">
+        <dc:Bounds x="1275" y="115" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1283" y="90" width="34" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Submit_di" bpmnElement="Task_Submit">
+        <dc:Bounds x="1400" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Submitted_di" bpmnElement="End_Submitted">
+        <dc:Bounds x="1572" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1548" y="265" width="86" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Resolve_di" bpmnElement="Task_Resolve">
+        <dc:Bounds x="580" y="360" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_MissingDocs_di" bpmnElement="End_MissingDocs">
+        <dc:Bounds x="737" y="382" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="715" y="425" width="82" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected">
+        <dc:Bounds x="1400" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1382" y="100" width="74" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- SLA event subprocess -->
+      <bpmndi:BPMNShape id="SubProcess_SLA_di" bpmnElement="SubProcess_SLA" isExpanded="true">
+        <dc:Bounds x="840" y="500" width="430" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TimerStart_SLA_di" bpmnElement="TimerStart_SLA">
+        <dc:Bounds x="872" y="562" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="852" y="605" width="78" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Escalate_di" bpmnElement="Task_Escalate">
+        <dc:Bounds x="960" y="540" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Escalated_di" bpmnElement="End_Escalated">
+        <dc:Bounds x="1142" y="562" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1122" y="605" width="78" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- edges: main flow -->
+      <bpmndi:BPMNEdge id="Flow_Start_Profile_di" bpmnElement="Flow_Start_Profile">
+        <di:waypoint x="208" y="240" /><di:waypoint x="260" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Profile_Eligibility_di" bpmnElement="Flow_Profile_Eligibility">
+        <di:waypoint x="370" y="240" /><di:waypoint x="420" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Eligibility_Audit_di" bpmnElement="Flow_Eligibility_Audit">
+        <di:waypoint x="530" y="240" /><di:waypoint x="580" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Audit_Gateway_di" bpmnElement="Flow_Audit_Gateway">
+        <di:waypoint x="690" y="240" /><di:waypoint x="735" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Mismatch_Resolve_di" bpmnElement="Flow_Mismatch_Resolve">
+        <di:waypoint x="630" y="298" /><di:waypoint x="630" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Docs_No_di" bpmnElement="Flow_Docs_No">
+        <di:waypoint x="760" y="265" /><di:waypoint x="760" y="320" /><di:waypoint x="690" y="320" /><di:waypoint x="660" y="360" />
+        <bpmndi:BPMNLabel><dc:Bounds x="700" y="300" width="90" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Docs_Yes_di" bpmnElement="Flow_Docs_Yes">
+        <di:waypoint x="785" y="240" /><di:waypoint x="840" y="240" />
+        <bpmndi:BPMNLabel><dc:Bounds x="800" y="222" width="22" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Resolve_End_di" bpmnElement="Flow_Resolve_End">
+        <di:waypoint x="690" y="400" /><di:waypoint x="737" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NPCI_Approval_di" bpmnElement="Flow_NPCI_Approval">
+        <di:waypoint x="950" y="240" /><di:waypoint x="1005" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approval_Yes_di" bpmnElement="Flow_Approval_Yes">
+        <di:waypoint x="1030" y="215" /><di:waypoint x="1030" y="140" /><di:waypoint x="1110" y="140" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1040" y="170" width="22" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approval_No_di" bpmnElement="Flow_Approval_No">
+        <di:waypoint x="1030" y="265" /><di:waypoint x="1030" y="240" /><di:waypoint x="1400" y="240" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1200" y="222" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approval_Decision_di" bpmnElement="Flow_Approval_Decision">
+        <di:waypoint x="1220" y="140" /><di:waypoint x="1275" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Decision_Approved_di" bpmnElement="Flow_Decision_Approved">
+        <di:waypoint x="1300" y="165" /><di:waypoint x="1300" y="240" /><di:waypoint x="1400" y="240" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1310" y="200" width="52" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Decision_Rejected_di" bpmnElement="Flow_Decision_Rejected">
+        <di:waypoint x="1325" y="140" /><di:waypoint x="1400" y="140" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1340" y="122" width="46" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Submit_End_di" bpmnElement="Flow_Submit_End">
+        <di:waypoint x="1510" y="240" /><di:waypoint x="1572" y="240" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

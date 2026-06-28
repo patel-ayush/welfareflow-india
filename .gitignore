@@ -1,0 +1,48 @@
+# --- Secrets (NEVER commit) ---
+.env
+*.key
+*.pem
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.so
+htmlcov/
+.coverage
+coverage.xml
+
+# --- Node / Next.js ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.production.local
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDE ---
+.idea/
+.vscode/settings.json
+*.swp
+
+# --- Alembic runtime artifacts ---
+alembic.ini
+
+# --- Generated / local-only artifacts ---
+win-plan.html
+
+# --- Claude Code ---
+.claude/
