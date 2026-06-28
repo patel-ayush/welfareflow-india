@@ -55,6 +55,7 @@ from mock_registry import (
     MOCK_CITIZEN_DB,
     MOCK_NPCI_DB,
     PMKISAN_ELIGIBILITY_RULES,
+    get_citizen_record,
 )
 from schemas import (
     DocumentAuditResult,
@@ -483,7 +484,7 @@ async def transcribe_audio_saaras(
     produces a usable transcript with zero external calls or tokens.
     """
     def _mock() -> dict[str, Any]:
-        record: dict[str, object] = MOCK_CITIZEN_DB.get(citizen_id, {})
+        record: dict[str, object] = get_citizen_record(citizen_id)
         name: str = str(record.get("full_name_aadhaar", "Ramesh Kumar"))
         district: str = str(record.get("district", "Mandya"))
         land: str = str(record.get("land_area_acres", 2.0))
@@ -562,7 +563,7 @@ async def _call_sarvam_vision(
     citizen's name-match scenario behaves according to their own data.
     """
     if settings.sarvam_mock_mode or not settings.sarvam_api_key:
-        record: dict[str, object] = MOCK_CITIZEN_DB.get(citizen_id, {})
+        record: dict[str, object] = get_citizen_record(citizen_id)
         name_aadhaar: str = str(record.get("full_name_aadhaar", "Ramesh Kumar"))
         name_ration: str = str(record.get("full_name_ration_card", "Ramesha K"))
         name_passbook: str = str(record.get("full_name_passbook", "R. Kumar"))
@@ -834,8 +835,8 @@ async def voice_intent_agent_node(state: WelfareWorkflowState) -> dict[str, Any]
         extracted: dict[str, Any] = profile.model_dump()
     except Exception as exc:
         logger.error("voice_intent_agent LLM call failed: %s", exc)
-        # Graceful fallback — extract from mock registry if citizen_id is known
-        citizen_record: Optional[dict[str, object]] = MOCK_CITIZEN_DB.get(state["citizen_id"])
+        # Graceful fallback — extract from static or dynamic registry if citizen_id is known
+        citizen_record: Optional[dict[str, object]] = get_citizen_record(state["citizen_id"]) or None
         if citizen_record:
             extracted = {
                 "full_name": str(citizen_record["full_name_aadhaar"]),

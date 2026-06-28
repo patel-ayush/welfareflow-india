@@ -36,9 +36,30 @@ class ConsentItem(BaseModel):
 # POST /api/cases/initialize  —  request & response
 # ---------------------------------------------------------------------------
 
+class CustomCitizenData(BaseModel):
+    """Free-form citizen data for live (non-demo) submissions."""
+    name_aadhaar: str = Field(description="Name exactly as printed on Aadhaar card")
+    name_ration_card: str = Field(description="Name exactly as printed on Ration Card")
+    name_passbook: str = Field(description="Name exactly as printed on Bank Passbook")
+    state: str = Field(default="Karnataka")
+    district: str = Field(default="Unknown")
+    annual_income_inr: int = Field(default=40000)
+    land_area_acres: float = Field(default=2.0)
+    age: int = Field(default=40)
+    aadhaar_last4: str = Field(default="0000", description="Last 4 digits of Aadhaar number")
+    phone: str = Field(default="9999999999")
+
+
 class InitializeCaseRequest(BaseModel):
-    citizen_id: str = Field(
-        description="Internal citizen identifier from citizen onboarding record"
+    citizen_id: Optional[str] = Field(
+        default=None,
+        description="Demo citizen identifier (CITIZEN-001 … CITIZEN-005). "
+                    "Omit when supplying custom_citizen instead.",
+    )
+    custom_citizen: Optional[CustomCitizenData] = Field(
+        default=None,
+        description="Free-form citizen details for live (non-demo) submissions. "
+                    "Required when citizen_id is not provided.",
     )
     raw_transcript: str = Field(
         default="",

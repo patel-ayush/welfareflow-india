@@ -56,15 +56,14 @@ const DEFAULT_CONSENT_ITEMS = [
 
 export function initializeCase(payload: CaseInitPayload): Promise<CaseInitResponse> {
   return post<CaseInitResponse>("/cases/initialize", {
-    citizen_id: payload.citizen_id,
+    // One of citizen_id or custom_citizen must be provided; backend validates.
+    ...(payload.citizen_id    ? { citizen_id: payload.citizen_id }         : {}),
+    ...(payload.custom_citizen ? { custom_citizen: payload.custom_citizen } : {}),
     raw_transcript: payload.raw_transcript ?? "",
     consent_items: DEFAULT_CONSENT_ITEMS,
     otp_verified: payload.consent_given,
     language_code: payload.language_code ?? "kn-IN",
-    // Documents drive the cross-document name-match check (the core feature).
-    // Without them the backend has nothing to compare and every case passes.
     documents: payload.documents ?? [],
-    // Backend field name is `audio_base64` (schemas.InitializeCaseRequest).
     ...(payload.audio_base64 ? { audio_base64: payload.audio_base64 } : {}),
     ...(payload.require_approval !== undefined ? { require_approval: payload.require_approval } : {}),
   });

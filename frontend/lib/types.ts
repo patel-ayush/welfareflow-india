@@ -114,8 +114,22 @@ export interface DocumentUpload {
   filename: string;
 }
 
+export interface CustomCitizenData {
+  name_aadhaar: string;
+  name_ration_card: string;
+  name_passbook: string;
+  state: string;
+  district: string;
+  annual_income_inr: number;
+  land_area_acres: number;
+  age: number;
+  aadhaar_last4: string;
+  phone: string;
+}
+
 export interface CaseInitPayload {
-  citizen_id: string;
+  citizen_id?: string;
+  custom_citizen?: CustomCitizenData;
   consent_given: boolean;
   audio_base64?: string;
   raw_transcript?: string;

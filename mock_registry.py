@@ -136,6 +136,23 @@ AYUSHMAN_ELIGIBILITY_RULES: Final[dict[str, object]] = {
 # ---------------------------------------------------------------------------
 # Mock NPCI Aadhaar → Bank Account mapper (last4 is the mock lookup key)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Dynamic citizen registry — populated at runtime for live (non-demo) submissions.
+# Unlike MOCK_CITIZEN_DB this is mutable and keyed by generated "CUSTOM-*" IDs.
+# ---------------------------------------------------------------------------
+DYNAMIC_CITIZEN_DB: dict[str, dict[str, object]] = {}
+
+
+def register_custom_citizen(citizen_id: str, data: dict[str, object]) -> None:
+    """Register a custom citizen so OCR mocks use their actual submitted names."""
+    DYNAMIC_CITIZEN_DB[citizen_id] = data
+
+
+def get_citizen_record(citizen_id: str) -> dict[str, object]:
+    """Look up a citizen record from either the static or dynamic registry."""
+    return MOCK_CITIZEN_DB.get(citizen_id) or DYNAMIC_CITIZEN_DB.get(citizen_id, {})
+
+
 MOCK_NPCI_DB: Final[dict[str, dict[str, object]]] = {
     "5678": {
         "aadhaar_last4": "5678",

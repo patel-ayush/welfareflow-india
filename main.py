@@ -290,21 +290,51 @@ async def initialize_case(
     # Extract real client IP server-side — never trust ip_address from request body
     client_ip: str = (request.client.host if request.client else None) or "0.0.0.0"
 
-    # 3. Persist to database
-    from mock_registry import MOCK_CITIZEN_DB  # avoid circular at module level
+    # 3. Persist to database — resolve citizen identity
+    from mock_registry import MOCK_CITIZEN_DB, register_custom_citizen  # avoid circular
+
+    # Determine effective citizen_id and build the record used for DB writes.
+    if request_body.citizen_id:
+        effective_citizen_id: str = request_body.citizen_id
+        mock_record: dict = MOCK_CITIZEN_DB.get(effective_citizen_id, {})
+    elif request_body.custom_citizen:
+        c = request_body.custom_citizen
+        effective_citizen_id = f"CUSTOM-{str(uuid.uuid4())[:8].upper()}"
+        mock_record = {
+            "citizen_id": effective_citizen_id,
+            "full_name_aadhaar": c.name_aadhaar,
+            "full_name_ration_card": c.name_ration_card,
+            "full_name_passbook": c.name_passbook,
+            "aadhaar_last4": c.aadhaar_last4,
+            "phone": c.phone,
+            "state": c.state,
+            "district": c.district,
+            "land_area_acres": c.land_area_acres,
+            "annual_income_inr": c.annual_income_inr,
+            "age": c.age,
+            "occupation": "Farmer",
+            "bank_account": "99998888777",
+            "bank_ifsc": "SBIN0099999",
+            "is_govt_employee": False,
+            "existing_health_coverage": None,
+        }
+        register_custom_citizen(effective_citizen_id, mock_record)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Either citizen_id or custom_citizen must be provided.",
+        )
 
     async with session_scope() as session:
         # 3a. Upsert User record
         existing_user_result = await session.execute(
-            select(User).where(User.citizen_id == request_body.citizen_id)
+            select(User).where(User.citizen_id == effective_citizen_id)
         )
         db_user: User | None = existing_user_result.scalar_one_or_none()
 
-        mock_record = MOCK_CITIZEN_DB.get(request_body.citizen_id, {})
-
         if db_user is None:
             db_user = User(
-                citizen_id=request_body.citizen_id,
+                citizen_id=effective_citizen_id,
                 full_name=str(mock_record.get("full_name_aadhaar", "Unknown")),
                 phone=str(mock_record.get("phone", "0000000000")),
                 state=str(mock_record.get("state", "Unknown")),
@@ -336,7 +366,7 @@ async def initialize_case(
         _age_raw = mock_record.get("age")
         db_case: HouseholdCase = HouseholdCase(
             case_id=case_id,
-            citizen_id=request_body.citizen_id,
+            citizen_id=effective_citizen_id,
             status="INITIALISED",
             current_agent="initialising",
             tracking_token=tracking_token,
@@ -354,7 +384,7 @@ async def initialize_case(
         for item in request_body.consent_items:
             consent_row: ConsentLog = ConsentLog(
                 case_id=case_id,
-                citizen_id=request_body.citizen_id,
+                citizen_id=effective_citizen_id,
                 item_code=item.item_code,
                 description_en=item.description_en,
                 description_hi=item.description_hi,
@@ -367,7 +397,7 @@ async def initialize_case(
         logger.info(
             "Case %s initialised for citizen %s — %d consent items logged",
             case_id,
-            request_body.citizen_id,
+            effective_citizen_id,
             len(request_body.consent_items),
         )
 
@@ -376,7 +406,7 @@ async def initialize_case(
 
     # 5. Build the initial LangGraph state
     initial_state: WelfareWorkflowState = WelfareWorkflowState(
-        citizen_id=request_body.citizen_id,
+        citizen_id=effective_citizen_id,
         case_id=case_id,
         stream_queue_id=case_id,
         raw_transcript=request_body.raw_transcript,
